@@ -1,0 +1,35 @@
+#Repository Setup 
+mkdir -p /home/codespace/.config/fish/conf.d/
+
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+source "$HOME/.cargo/env"
+
+//Rust Programming Repository
+git clone https://github.com/alfazick/rustprogramming.git
+
+//Setup src folder with main
+cargo init
+
+//Runs assignment tests
+cargo test
+
+//Runs Assignment tests and return assignment grade
+cargo test 2>&1 | grep "test result" | awk '{print $4, "tests passed. Score:", $4*20 "/100"}'
+
+//Runs code
+cargo run
+
+
+
+//Creating a new Project 
+cargo new {project name}
+
+//must change directory to active project 
+cd {project name}
+
+// go back 1 directory
+cd .. 
+
+//removes project
+rm -rf {project name}/
