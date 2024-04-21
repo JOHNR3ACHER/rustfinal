@@ -8,11 +8,18 @@ use std::fs;
 use std::fs::ReadDir;
 
 fn squential(paths:ReadDir){
+    let mut wordcount: HashMap<&str,i32> = HashMap::new();
     for path in paths {
         let contents = fs::read_to_string(path.unwrap().path()).expect("Should have been able to read the file");
-        println!("{} + 1", contents);
-    }
-    
+        let words:Vec<&str> = contents.split(&[' ','\n','.','!','?']).collect();
+        for word in words{
+            if !wordcount.contains_key(word){
+                wordcount.insert(word, 0);
+            }else{
+                *wordcount.get_mut(word).unwrap() += 1;
+            }
+        }
+    }  
 }
 
 
