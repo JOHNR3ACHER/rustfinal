@@ -27,7 +27,7 @@ fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
 
 fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     paths
-        .par_iter()
+        .into_par_iter()
         .map(|entry| {
             let contents = fs::read_to_string(entry.path()).expect("Error");
             let mut wordcount: HashMap<String, i32> = HashMap::new();
