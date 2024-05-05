@@ -72,7 +72,7 @@ fn main() {
     let seq_map = squential(paths);
     let elapsed_time = now.elapsed();
     println!("Running sequential() took {} ms", elapsed_time.as_millis());
-    println!("Size of seq_map; {}", seq_map.len());
+    println!("Size of seq_map: {}", seq_map.len());
 
     //Parallelism
     let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
@@ -80,12 +80,13 @@ fn main() {
     let par_map = parallelism(paths);
     let elapsed_time = now.elapsed();
     println!("Running parallelism() took {} ms", elapsed_time.as_millis());
-    println!("Size of par_map; {}", par_map.len());
+    println!("Size of par_map: {}", par_map.len());
 
     // //Pipeline parallelism
     // let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
     // let now = Instant::now();
     // let pipe_map = pipeparallelism(paths);
     // let elapsed_time = now.elapsed();
-    // println!("Running rayon() took {} ms", elapsed_time.as_millis());
+    // println!("Running pipeparallelism() took {} ms", elapsed_time.as_millis());
+    //println!("Size of pipe_map: {}", pipe_map.len());
 }
