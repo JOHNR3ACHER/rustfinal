@@ -5,7 +5,6 @@ use std::time::Instant;
 extern crate rayon;
 use rayon::prelude::*;
 
-
 fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     //Initalize new hashmap
     let mut wordcount: HashMap<String, i32> = HashMap::new();
@@ -24,7 +23,7 @@ fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
 
 fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     paths
-        //uses parallel iterators 
+        //uses parallel iterators
         .into_par_iter()
         .map(|entry| {
             //read contentes of path
@@ -42,27 +41,29 @@ fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
         .reduce(
             || HashMap::new(),
             |mut acc, map| {
+                //loops through all contents of map
                 for (word, count) in map {
+                    //accumulates all hashs into one
                     *acc.entry(word).or_insert(1) += count;
                 }
                 acc
-            })
+            },
+        )
 }
 
 fn read(paths: Vec<DirEntry>) -> Vec<String> {
     paths
-        //uses parallel iterators 
+        //uses parallel iterators
         .into_par_iter()
-            
-            .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
-            .collect()
+        .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
+        .collect()
 }
 
-fn count(words: Vec<String>) -> Vec<HashMap<String,i32>>{
+fn count(words: Vec<String>) -> Vec<HashMap<String, i32>> {
     words
         //uses parallel iterators
         .into_par_iter()
-        .map(|words|{
+        .map(|words| {
             //Initalize new hashmap
             let mut wordcount: HashMap<String, i32> = HashMap::new();
             //loops through all words in word
@@ -73,18 +74,17 @@ fn count(words: Vec<String>) -> Vec<HashMap<String,i32>>{
             wordcount
         })
         .collect()
-
 }
 
-fn combine(hashs:Vec<HashMap<String,i32>>)->HashMap<String,i32>{
-    hashs
-        .into_iter()
-        .fold(HashMap::new(), |mut acc, map| {
-            for (word, count) in map {
-                *acc.entry(word).or_insert(1) += count;
-            }
-            acc
-        })
+fn combine(hashs: Vec<HashMap<String, i32>>) -> HashMap<String, i32> {
+    hashs.into_iter().fold(HashMap::new(), |mut acc, map| {
+        //loops through all contents of map
+        for (word, count) in map {
+            //accumulates all hashs into one
+            *acc.entry(word).or_insert(1) += count;
+        }
+        acc
+    })
 }
 
 //#[allow(unused_variables)]
@@ -112,6 +112,6 @@ fn main() {
     let count = count(words);
     let pipe_map = combine(count);
     let elapsed_time: std::time::Duration = now.elapsed();
-    println!("Running pipeparallelism() took {} ms", elapsed_time.as_millis());
+    println!("Running pipeparallelism() took {} ms",elapsed_time.as_millis());
     println!("Size of pipe_map: {}", pipe_map.len());
 }
