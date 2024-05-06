@@ -2,13 +2,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::fs::DirEntry;
 use std::time::Instant;
-//extern crate rayon;
+extern crate rayon;
 use rayon::prelude::*;
 
-//use std::fs::ReadDir;
-
-// use std::thread;
-// use std::env;
 
 fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     //Initalize new hashmap
@@ -17,19 +13,13 @@ fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     for path in paths {
         //read contentes of path
         let contents = fs::read_to_string(path.path()).expect("Error");
-        //create a vector of only words in path
-        let words: Vec<&str> = contents.split_whitespace().collect();
-        //loop through every word in words 
-        for word in words {
-            //checks if hashmap contains word
-            if !wordcount.contains_key(word) {
-                wordcount.insert(word.to_string(), 1);
-            } else {
-                *wordcount.get_mut(word).unwrap() += 1;
-            }
+        //loops through all words in contents
+        for word in contents.split_whitespace() {
+            //checks if hashmap contains word if not insert and set to 1
+            *wordcount.entry(word.to_string()).or_insert(1) += 1;
         }
     }
-    return wordcount;
+    wordcount
 }
 
 fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
@@ -41,30 +31,63 @@ fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
             let contents = fs::read_to_string(entry.path()).expect("Error");
             //Initalize new hashmap
             let mut wordcount: HashMap<String, i32> = HashMap::new();
-            //let words: Vec<&str> = contents.split_whitespace().collect();
+            //loops through all words in contents
             for word in contents.split_whitespace() {
-                *wordcount.entry(word.to_string()).or_insert(0) += 1;
+                //checks if hashmap contains word if not insert and set to 1
+                *wordcount.entry(word.to_string()).or_insert(1) += 1;
             }
             wordcount
         })
+        //combine all hash maps into one
         .reduce(
             || HashMap::new(),
             |mut acc, map| {
                 for (word, count) in map {
-                    *acc.entry(word).or_insert(0) += count;
+                    *acc.entry(word).or_insert(1) += count;
                 }
                 acc
-            },
-        )
+            })
 }
 
-// fn pipeparallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
-//     let mut wordcount: HashMap<String, i32> = HashMap::new();
+fn read(paths: Vec<DirEntry>) -> Vec<String> {
+    paths
+        //uses parallel iterators 
+        .into_par_iter()
+            
+            .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
+            .collect()
+}
 
-//     return wordcount;
-// }
+fn count(words: Vec<String>) -> Vec<HashMap<String,i32>>{
+    words
+        //uses parallel iterators
+        .into_par_iter()
+        .map(|words|{
+            //Initalize new hashmap
+            let mut wordcount: HashMap<String, i32> = HashMap::new();
+            //loops through all words in word
+            for word in words.split_whitespace() {
+                //checks if hashmap contains word if not insert and set to 1
+                *wordcount.entry(word.to_string()).or_insert(1) += 1;
+            }
+            wordcount
+        })
+        .collect()
 
-#[allow(unused_variables)]
+}
+
+fn combine(hashs:Vec<HashMap<String,i32>>)->HashMap<String,i32>{
+    hashs
+        .into_iter()
+        .fold(HashMap::new(), |mut acc, map| {
+            for (word, count) in map {
+                *acc.entry(word).or_insert(1) += count;
+            }
+            acc
+        })
+}
+
+//#[allow(unused_variables)]
 fn main() {
     //Sequential
     let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
@@ -82,11 +105,13 @@ fn main() {
     println!("Running parallelism() took {} ms", elapsed_time.as_millis());
     println!("Size of par_map: {}", par_map.len());
 
-    // //Pipeline parallelism
-    // let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
-    // let now = Instant::now();
-    // let pipe_map = pipeparallelism(paths);
-    // let elapsed_time = now.elapsed();
-    // println!("Running pipeparallelism() took {} ms", elapsed_time.as_millis());
-    //println!("Size of pipe_map: {}", pipe_map.len());
+    //Pipeline parallelism
+    let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    let now = Instant::now();
+    let words = read(paths);
+    let count = count(words);
+    let pipe_map = combine(count);
+    let elapsed_time: std::time::Duration = now.elapsed();
+    println!("Running pipeparallelism() took {} ms", elapsed_time.as_millis());
+    println!("Size of pipe_map: {}", pipe_map.len());
 }
