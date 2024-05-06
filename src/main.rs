@@ -87,7 +87,6 @@ fn combine(hashs: Vec<HashMap<String, i32>>) -> HashMap<String, i32> {
     })
 }
 
-//#[allow(unused_variables)]
 fn main() {
     //Sequential
     let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
