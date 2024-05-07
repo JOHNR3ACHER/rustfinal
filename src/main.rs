@@ -54,24 +54,30 @@ fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
         )
 }
 
+//Creates message enum that allows communication between actor models
 enum Message {
     FileContents(Vec<String>),
     WordCounts(Vec<HashMap<String, i32>>),
     CombinedCount(HashMap<String, i32>),
+    Shutdown,
 }
 
 struct ReadActor {
     sender: Sender<Message>,
 }
 
+//sends
 impl ReadActor {
+    //Function that reads contents of path
     fn read(&self, paths: Vec<DirEntry>) {
         let contents: Vec<String> = paths
             //uses parallel iterators
-            .into_iter()
+            .into_par_iter()
             .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
             .collect();
-        self.sender.send(Message::FileContents(contents)).unwrap();
+        self.sender.send(Message::FileContents(contents.clone())).unwrap();
+        println!("Message sent from ReadActor"); // Debug print
+        self.sender.send(Message::FileContents(contents.clone())).unwrap();
     }
 }
 
@@ -81,9 +87,10 @@ struct CountActor {
 
 impl CountActor {
     fn count(&self, words: Vec<String>) {
+        println!("CountActor received message");
         let wordcount: Vec<HashMap<String, i32>> = words
             //uses parallel iterators
-            .into_iter()
+            .into_par_iter()
             .map(|words| {
                 //Initalize new hashmap
                 let mut wordcount: HashMap<String, i32> = HashMap::new();
@@ -95,6 +102,7 @@ impl CountActor {
                 wordcount
             })
             .collect();
+        println!("CountActor: Sending WordCounts message.");
         self.sender.send(Message::WordCounts(wordcount)).unwrap();
     }
 }
@@ -105,6 +113,7 @@ struct CombineActor {
 
 impl CombineActor {
     fn combine(&self, hashs: Vec<HashMap<String, i32>>) {
+        println!("CombineActor received message");
         let combined: HashMap<String, i32> =
             hashs.into_iter().fold(HashMap::new(), |mut acc, map| {
                 //loops through all contents of map
@@ -114,23 +123,18 @@ impl CombineActor {
                 }
                 acc
             });
+        println!("CombineActor: Sending CombinedCount message.");
         self.sender.send(Message::CombinedCount(combined)).unwrap();
     }
 }
 
 fn pipelineparalelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
-    
+    //println!("Starting pipelineparalelism...");
     let (sender, receiver) = channel();
 
-    let read = ReadActor {
-        sender: sender.clone(),
-    };
-    let count = CountActor {
-        sender: sender.clone(),
-    };
-    let combine = CombineActor {
-        sender: sender.clone(),
-    };
+    let read = ReadActor {sender: sender.clone(),};
+    let count = CountActor {sender: sender.clone(),};
+    let combine = CombineActor {sender: sender.clone(),};
 
     let receiver = Arc::new(Mutex::new(receiver));
 
@@ -139,19 +143,29 @@ fn pipelineparalelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     thread::spawn(move || read.read(paths));
 
     thread::spawn(move || {
+        println!("CountActor before receiving message"); // Debug print
         let words = match receiverclone.lock().unwrap().recv() {
             Ok(Message::FileContents(contents)) => contents,
-            _ => return,
+            _ => {
+                println!("Error: Failed to receive FileContents message");
+                return;
+            },
         };
+        println!("CountActor after receiving message"); // Debug print
         count.count(words);
     });
 
     let receiverclone = receiver.clone();
     thread::spawn(move || {
+        println!("CombineActor before receiving message"); // Debug print
         let count = match receiverclone.lock().unwrap().recv() {
             Ok(Message::WordCounts(counts)) => counts,
-            _ => return,
+            _ => {
+                println!("Error: Failed to receive WordCounts message");
+                return;
+            },
         };
+        println!("CombineActor after receiving message"); // Debug print
         combine.combine(count);
     });
 
