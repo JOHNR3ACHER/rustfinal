@@ -76,8 +76,6 @@ impl ReadActor {
             .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
             .collect();
         self.sender.send(Message::FileContents(contents.clone())).unwrap();
-        println!("Message sent from ReadActor"); // Debug print
-        self.sender.send(Message::FileContents(contents.clone())).unwrap();
     }
 }
 
