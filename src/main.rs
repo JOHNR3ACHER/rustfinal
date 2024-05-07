@@ -4,9 +4,9 @@ use std::fs::DirEntry;
 use std::time::Instant;
 extern crate rayon;
 use rayon::prelude::*;
-use std::thread;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
+use std::thread;
 
 fn squential(paths: Vec<DirEntry>) -> HashMap<String, i32> {
     //Initalize new hashmap
@@ -54,35 +54,34 @@ fn parallelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
         )
 }
 
-enum Message{
+enum Message {
     FileContents(Vec<String>),
     WordCounts(Vec<HashMap<String, i32>>),
     CombinedCount(HashMap<String, i32>),
-    Shutdown,
 }
 
-struct ReadActor{
+struct ReadActor {
     sender: Sender<Message>,
 }
 
-impl ReadActor{
-    fn read(&self,paths: Vec<DirEntry>){
-        let contents:Vec<String> = paths
+impl ReadActor {
+    fn read(&self, paths: Vec<DirEntry>) {
+        let contents: Vec<String> = paths
             //uses parallel iterators
             .into_iter()
             .map(|entry| fs::read_to_string(entry.path()).unwrap_or_default())
             .collect();
         self.sender.send(Message::FileContents(contents)).unwrap();
     }
-}    
+}
 
-struct CountActor{
+struct CountActor {
     sender: Sender<Message>,
 }
 
-impl CountActor{
-    fn count(&self,words: Vec<String>){
-        let wordcount:Vec<HashMap<String, i32>> = words
+impl CountActor {
+    fn count(&self, words: Vec<String>) {
+        let wordcount: Vec<HashMap<String, i32>> = words
             //uses parallel iterators
             .into_iter()
             .map(|words| {
@@ -100,32 +99,38 @@ impl CountActor{
     }
 }
 
-
-struct CombineActor{
+struct CombineActor {
     sender: Sender<Message>,
 }
 
-impl CombineActor{
-    fn combine(&self,hashs: Vec<HashMap<String, i32>>){
-        let combined:HashMap<String, i32> = hashs.into_iter().fold(HashMap::new(), |mut acc, map| {
-            //loops through all contents of map
-            for (word, count) in map {
-                //accumulates all hashs into one
-                *acc.entry(word).or_insert(1) += count;
-            }
-            acc
-        });
+impl CombineActor {
+    fn combine(&self, hashs: Vec<HashMap<String, i32>>) {
+        let combined: HashMap<String, i32> =
+            hashs.into_iter().fold(HashMap::new(), |mut acc, map| {
+                //loops through all contents of map
+                for (word, count) in map {
+                    //accumulates all hashs into one
+                    *acc.entry(word).or_insert(1) += count;
+                }
+                acc
+            });
         self.sender.send(Message::CombinedCount(combined)).unwrap();
     }
 }
 
-fn pipelineparalelism(paths: Vec<DirEntry>)-> HashMap<String,i32>{    
-
+fn pipelineparalelism(paths: Vec<DirEntry>) -> HashMap<String, i32> {
+    
     let (sender, receiver) = channel();
 
-    let read = ReadActor{sender: sender.clone()};
-    let count = CountActor{sender: sender.clone()};
-    let combine = CombineActor{sender: sender.clone()};
+    let read = ReadActor {
+        sender: sender.clone(),
+    };
+    let count = CountActor {
+        sender: sender.clone(),
+    };
+    let combine = CombineActor {
+        sender: sender.clone(),
+    };
 
     let receiver = Arc::new(Mutex::new(receiver));
 
@@ -134,34 +139,36 @@ fn pipelineparalelism(paths: Vec<DirEntry>)-> HashMap<String,i32>{
     thread::spawn(move || read.read(paths));
 
     thread::spawn(move || {
-        let words = match receiverclone.lock().unwrap().recv(){
+        let words = match receiverclone.lock().unwrap().recv() {
             Ok(Message::FileContents(contents)) => contents,
-            _=> return, 
-       };
-       count.count(words);
+            _ => return,
+        };
+        count.count(words);
     });
 
     let receiverclone = receiver.clone();
     thread::spawn(move || {
-        let count = match receiverclone.lock().unwrap().recv(){
+        let count = match receiverclone.lock().unwrap().recv() {
             Ok(Message::WordCounts(counts)) => counts,
-            _=> return, 
-       };
-       combine.combine(count);
+            _ => return,
+        };
+        combine.combine(count);
     });
 
     // Receive the final combined word count
     let x = match receiver.lock().unwrap().recv() {
         Ok(Message::CombinedCount(combined_word_count)) => combined_word_count,
         _ => HashMap::new(),
-    }; x
-
+    };
+    x
 }
-
 
 fn main() {
     //Sequential
-    let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    let paths = fs::read_dir("books")
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
     let now = Instant::now();
     let seq_map = squential(paths);
     let elapsed_time = now.elapsed();
@@ -169,7 +176,10 @@ fn main() {
     println!("Size of seq_map: {}", seq_map.len());
 
     //Parallelism
-    let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    let paths = fs::read_dir("books")
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
     let now = Instant::now();
     let par_map = parallelism(paths);
     let elapsed_time = now.elapsed();
@@ -177,10 +187,16 @@ fn main() {
     println!("Size of par_map: {}", par_map.len());
 
     //Pipeline parallelism
-    let paths = fs::read_dir("books").unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    let paths = fs::read_dir("books")
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
     let now = Instant::now();
     let pipe_map = pipelineparalelism(paths);
     let elapsed_time: std::time::Duration = now.elapsed();
-    println!("Running pipeparallelism() took {} ms",elapsed_time.as_millis());
+    println!(
+        "Running pipeparallelism() took {} ms",
+        elapsed_time.as_millis()
+    );
     println!("Size of pipe_map: {}", pipe_map.len());
 }
